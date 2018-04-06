@@ -9,6 +9,8 @@
 
 #define PORT 8080
 
+void test_func(int sock);
+
 int main()
 {
 
@@ -44,7 +46,7 @@ int main()
 
     // accept the incoming connection request
     int clientlen = sizeof(client_addr);
-    newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, (struct socklen_t *)&clientlen);
+    newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, (socklen_t *)&clientlen);
 
     // do something with connection
     test_func(newsockfd);
