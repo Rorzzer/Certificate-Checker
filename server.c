@@ -79,24 +79,24 @@ void test_func(int sock){
     int state = NOT_AUTH;
 
 //    while(1) {
-        // wait for client response
-        recv(sock, recbuf, 1000, 0);
+    // wait for client response
+    recv(sock, recbuf, 1000, 0);
 //        printf("%s\n", recbuf);
-        method = strtok(recbuf, methoddelim);
+    method = strtok(recbuf, methoddelim);
 //        printf("method: %s\n", method);
 
-        if (!strcmp(method, "GET")){
-            // get request
-            printf("Method: %s\n", method);
-            path = strtok(NULL, pathdelim);
-            printf("Path: %s\n", path);
+    if (!strcmp(method, "GET")){
+        // get request
+        printf("Method: %s\n", method);
+        path = strtok(NULL, pathdelim);
+        printf("Path: %s\n", path);
 
-        } else if (!strcmp(method, "POST")){
-            // if a post request is sent
-            printf("This server currently only implements HTTP/1.0\n");
-        } else {
-            printf("Unrecognised HTTP request\n");
-        }
+    } else if (!strcmp(method, "POST")){
+        // if a post request is sent
+        printf("This server currently only implements HTTP/1.0\n");
+    } else {
+        printf("Unrecognised HTTP request\n");
+    }
 
 //        while(1){
 //            recv(sock, recbuf, 1000, 0);
