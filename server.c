@@ -3,100 +3,167 @@
 //
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <ctype.h>
+#include <pthread.h>
 
-#define PORT 1234
 
-void test_func(int sock);
+//#define PORT 1234
+#define BYTES 1024
+#define DIR "dir"
 
-int main()
+void *parse_HTTP(void *sock);
+//int create_socket(int domain, int type, int proto);
+
+int main(int argc, char *argv[])
 {
+    struct sockaddr_in serv_addr;
+    int sockfd, /*newsockfd,*/ port;
+    char path[100];
+    pthread_t thread;
 
-    struct sockaddr_in serv_addr, client_addr;
+    if ((atoi(argv[1]) > 0))
+    {
+        port = atoi(argv[1]);
+    } else
+        {
+        printf("Please specify a valid port number\n");
+        exit(1);
+        }
 
-    int sockfd, newsockfd;
+    strcpy(path, argv[2]);
 
     // create socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(sockfd < 0)
+    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         printf("Can not open socket, port in use.\n");
-        return -1;
+        exit(1);
     }
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_port = htons(port);
+        serv_addr.sin_addr.s_addr = 0;
+        serv_addr.sin_addr.s_addr = INADDR_ANY;
 
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
-    serv_addr.sin_addr.s_addr = 0;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-
-
-    // Bind to the socket
+    // Bind to the socket to port
     if(bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr_in) ) < 0)
     {
         perror("Error binding socket\n");
-        return -1;
+        exit(1);
     }
-
-    printf("Successfully bound to port %u\n", PORT);
+    printf("Successfully bound to port %u\n", port);
 
     // listen to for connection on port
     listen(sockfd, 5);
 
-    // accept the incoming connection request
-    int clientlen = sizeof(client_addr);
-    newsockfd = accept(sockfd, (struct sockaddr *)&client_addr, (socklen_t *)&clientlen);
-    printf("accepted new client\n");
+    while(1)
+    {
+        struct sockaddr_in client_addr = {0};
+        int newsock = 0;
+        int clientlen = sizeof(client_addr);
 
-    // do something with connection
-    test_func(newsockfd);
+        newsock = accept(sockfd, (struct sockaddr *)&client_addr, (socklen_t *)&clientlen);
 
-    close(newsockfd);
+        if(newsock  == -1)
+        {
+            perror("Cannot accept new connection\n");
+            exit(1);
+        } else
+            // thread for each connection
+            {
+                // create a void ptr argument to send each thread
+                int *arg = malloc(sizeof(*arg));
+                *arg = newsock;
+
+                if((pthread_create(&thread, NULL, parse_HTTP, arg)) != 0)
+                    {
+                        perror("Could not create thread\n");
+                        exit(1);
+                    }
+
+//              printf("thread\n");
+                pthread_detach(thread);
+                sched_yield();
+            }
+    }
+
     close(sockfd);
-
 }
 
-void test_func(int sock){
+
+void *parse_HTTP(void *sock)
+{
 
     const int NOT_AUTH = 0;
 
-    char sendbuf[10000];
-    char recbuf[1000];
-    char *token;
-    char *method;
-    char *path;
-    char *httpver;
+    char sendbuf[10000], recbuf[1000], to_send[BYTES], newpath[1000];
+    char *token, *method, *path, *httpver;
     const char methoddelim[2] = " ";
     const char pathdelim[2] = " ";
+    int fd, bytes_read;
 
+    int socket = *((int *) sock);
+    free(sock);
+//  int socket = (int)sock;
 
     strcpy(sendbuf, "HTTP/1.0 200 OK\r\n\r\n");
-    send(sock, sendbuf, strlen(sendbuf), 0);
+    send(socket, sendbuf, strlen(sendbuf), 0);
 
     int state = NOT_AUTH;
 
 //    while(1) {
     // wait for client response
-    recv(sock, recbuf, 1000, 0);
+    if((recv(socket, recbuf, 1000, 0)) == -1)
+    {
+        perror("client disconnected\n");
+        return 0;
+    }
+
 //        printf("%s\n", recbuf);
     method = strtok(recbuf, methoddelim);
-//        printf("method: %s\n", method);
 
-    if (!strcmp(method, "GET")){
+        printf("method: %s\n", method);
+
+
+
+    if ((method != NULL) && !strcmp(method, "GET"))
+    {
         // get request
         printf("Method: %s\n", method);
         path = strtok(NULL, pathdelim);
         printf("Path: %s\n", path);
 
-    } else if (!strcmp(method, "POST")){
-        // if a post request is sent
-        printf("This server currently only implements HTTP/1.0\n");
-    } else {
-        printf("Unrecognised HTTP request\n");
-    }
+        if (strcmp(path, "/"))
+        {
+
+            strcpy(sendbuf, "HTTP/1.0 200 OK"
+                            "Server: Rorys Server v1.0\n"
+                            "Content-Type: image/jpeg\r\n\r\n");
+            send(socket, sendbuf, strlen(sendbuf), 0);
+
+            strcpy(newpath, DIR);
+            strcpy(&newpath[strlen(DIR)], path);
+
+        } else
+            {
+            path = strcat(path, "index.html");
+
+            }
+
+    } else if ((method != NULL) && !strcmp(method, "POST"))
+        {
+            // if a post request is sent
+            printf("This server currently only implements HTTP/1.0\n");
+
+        } else
+            {
+            printf("Unrecognised HTTP request\n");
+            }
 
 //        while(1){
 //            recv(sock, recbuf, 1000, 0);
@@ -118,5 +185,7 @@ void test_func(int sock){
 //            send(sock, buf, strlen(buf), 0);
 //        }
 //    }
+
+    return 0;
 }
 
