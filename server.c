@@ -18,8 +18,14 @@
 int main(int argc, char *argv[])
 {
     struct sockaddr_in serv_addr;
-    int sockfd, /*newsockfd,*/ port;
+    int sockfd, port;
     pthread_t thread;
+
+    if(argc < 3)
+    {
+        perror("Usage: ./server [port number] [root directory]\n");
+        exit(EXIT_FAILURE);
+    }
 
     if ((atoi(argv[1]) > 0))
     {
@@ -28,7 +34,7 @@ int main(int argc, char *argv[])
     else
         {
         perror("Please specify a valid port number\n");
-        exit(1);
+        exit(EXIT_FAILURE);
         }
 
     strcpy(ROOT, argv[2]);
@@ -37,7 +43,7 @@ int main(int argc, char *argv[])
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("Can not open socket, port in use.\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     // set socket details
@@ -50,7 +56,7 @@ int main(int argc, char *argv[])
     if(bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr_in) ) < 0)
     {
         perror("Error binding socket\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     printf("Successfully bound to port %u\n", port);
 
@@ -69,7 +75,7 @@ int main(int argc, char *argv[])
         if(newsock  == -1)
         {
             perror("Cannot accept new connection\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         else
             // thread for each connection
@@ -81,7 +87,7 @@ int main(int argc, char *argv[])
                 if((pthread_create(&thread, NULL, parse_HTTP, arg)) != 0)
                     {
                         perror("Could not create thread\n");
-                        exit(1);
+                        exit(EXIT_FAILURE);
                     }
                 pthread_detach(thread);
                 sched_yield();
@@ -210,6 +216,13 @@ void *parse_HTTP(void *sock)
             }
             path[i] = '\0';
         }
+        else
+        {
+            strcpy(buf, INVALIDREQHEAD);
+            write(socket, buf, strlen(buf));
+            perror("404 file not found\n");
+            pthread_exit(NULL);
+        }
 
 //        printf("path: %s \n\n", path);
 
@@ -231,61 +244,13 @@ void *parse_HTTP(void *sock)
     }
     else
     {
+//        printf("%s\n",buf);
         perror("Unrecognised HTTP request\n");
         pthread_exit(NULL);
     }
+    close(socket);
     pthread_exit(NULL);
     return 0;
-
-
-//
-//    method = (char*)malloc(sizeof(buf)+1);
-//    path = (char*)malloc(sizeof(path)+1);
-
-//    if (bytes_read > 0)
-//    {
-//        for(i = 1; i <= bytes_read; i++)
-//        {
-//            if(buf[i] == ' ')
-//            {
-//                delim = 1;
-//                printf("delim\n");
-//            }
-//            if(delim == 1)
-//            {
-//                printf("add to path: %c\n", buf[i]);
-//
-//                path[i] = buf[i];
-//            }
-//            else
-//            {
-//                method[i] = buf[i];
-//            }
-//        }
-//        printf("path: %s \nmethod: %s\n", path, method);
-//    }
-
-
-
-
-//
-//
-//    strcpy(method, buf);
-//    method = strsep(&method, delim);
-//    printf("method: %s\n", method);
-
-//    path = strsep(NULL, delim);
-//    printf("path: %s, strlen() = %lu", path, strlen(path));
-//    path[strlen(path)+1] = EOF_BUF;
-
-
-
-//    method = strtok(buf, delim);
-//    path = strtok(NULL, delim);
-//
-//    path[strlen(path)+1] = EOF_BUF;
-//    printf("path: %s", path);
-
 
 }
 
