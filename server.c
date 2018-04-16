@@ -12,35 +12,13 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <pthread.h>
+#include <server.h>
 
-
-//#define PORT 1234
-#define BYTES 1024
-#define DIR "dir"
-#define SERVER "RPOWELL HTTP Server v1.0\r\n"
-#define VERSION "HTTP/1.0"
-#define EOF_BUF '\0'
-#define VALIDREQHEAD "HTTP/1.0 200 OK\r\n"
-
-// filetypes
-#define HTML "html"
-#define JAVASCRIPT "js"
-#define CSS "css"
-#define JPEG "jpg"
-
-
-
-void *parse_HTTP(void *sock);
-int fileValid(char path[]);
-void get_req_reply(int sock, char path[]);
-char * get_filetype(char *path);
-//int create_socket(int domain, int type, int proto);
 
 int main(int argc, char *argv[])
 {
     struct sockaddr_in serv_addr;
     int sockfd, /*newsockfd,*/ port;
-    char path[100];
     pthread_t thread;
 
     if ((atoi(argv[1]) > 0))
@@ -49,16 +27,16 @@ int main(int argc, char *argv[])
     }
     else
         {
-        printf("Please specify a valid port number\n");
+        perror("Please specify a valid port number\n");
         exit(1);
         }
 
-    strcpy(path, argv[2]);
+    strcpy(ROOT, argv[2]);
 
     // create socket
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        printf("Can not open socket, port in use.\n");
+        perror("Can not open socket, port in use.\n");
         exit(1);
     }
 
@@ -105,8 +83,6 @@ int main(int argc, char *argv[])
                         perror("Could not create thread\n");
                         exit(1);
                     }
-
-//              printf("thread\n");
                 pthread_detach(thread);
                 sched_yield();
             }
@@ -117,8 +93,7 @@ int main(int argc, char *argv[])
 
 int fileValid(char path[])
 {
-//    printf("Path: \"%s\" \n", path);
-    //printf("%d \n", open(path, O_RDONLY, 0));
+    //printf("path: \"%s\"\n", path);
     return open(path, O_RDONLY, 0);
 }
 
@@ -130,8 +105,7 @@ char * get_filetype(char *path)
 
     extension = (char*)malloc(sizeof(path)+1);
 
-
-    for (i = 0; i <= sizeof(path); i++)
+    for (i = 0; i <= strlen(path); i++)
     {
         if(path[i] == '.'){
             eofFilename = 1;
@@ -142,22 +116,36 @@ char * get_filetype(char *path)
             j++;
         }
     }
-//    extension[sizeof(extension)+2] =
+    //printf("%s\n", extension);
     return extension;
+}
+
+int get_filesize(char *path)
+{
+    FILE *file;
+    int filesize = 0;
+
+    file = fopen(path, "r");
+
+    fseek(file, 0L, SEEK_END);
+    filesize = ftell(file);
+    fclose(file);
+    return filesize;
+
 }
 
 void get_req_reply(int sock, char path[])
 {
     char buf[1024];
-    char *filetype;
-    int filesize;
+    char *filetype, *filesizestr;
 
-
-    filetype = (char*)malloc(sizeof(buf)+1);
+    filetype = (char*)malloc(sizeof(buf));
+    filesizestr = (char*)malloc(sizeof(buf));
     filetype = get_filetype(path);
 
     strcpy(buf, VALIDREQHEAD);
-
+    sprintf(filesizestr, "Content-Length: %d\r\n", get_filesize(path));
+    strcat(buf, filesizestr);
 
     if(!strcmp(filetype, HTML))
     {
@@ -180,15 +168,8 @@ void get_req_reply(int sock, char path[])
         strcat(buf, "Content-Type: unknown;\r\n\n");
     }
 
-    //printf("filetype: %s\n", get_filetype(path));
+    strcat(buf, NEWLINE);
 
-//    printf("file type: %s\n", filetype);
-
-
-
-    //strcat(buf, filesize); // get the file size
-     // get the file type
-    //printf("buffer: %s\n", buf);
     write(sock, buf, strlen(buf));
 
 }
@@ -196,28 +177,15 @@ void get_req_reply(int sock, char path[])
 void *parse_HTTP(void *sock)
 {
 
-    const int NOT_AUTH = 0;
-
-    char sendbuf[10000], buf[1000], to_send[BYTES], newpath[1000];
-    char *token, *method, *path, *httpver, *filetype;
-    const char delim[1] = " ";
-    const char pathdelim[2] = " ";
-    int fd, bytes_read, buf_len;
+    char buf[1000], path[1000];
+    char *ptr;
+    int bytes_read = 0, i = 0;
 
     int socket = *((int *) sock);
     free(sock);
-//  int socket = (int)sock;
-
-
-//    strcpy(sendbuf, "HTTP/1.0 200 OK\r\n\r\n");
-//    send(socket, sendbuf, strlen(sendbuf), 0);
-
-    //int state = NOT_AUTH;
-
-//    while(1) {
 
     bytes_read = recv(socket, buf, 1000, 0);
-    buf[bytes_read] = EOF_BUF;
+    buf[bytes_read-1] = EOF_BUF;
 
     // wait for client response
     if(bytes_read == -1)
@@ -226,93 +194,98 @@ void *parse_HTTP(void *sock)
         return 0;
     }
 
-//      printf("%s\n", recbuf);
-    method = (char*)malloc(sizeof(buf)+1);
-    method = strtok(buf, delim);
-    //printf("method: \"%s\"\n", method);
+    strcpy(path, ROOT);
 
-    path = (char*)malloc(sizeof(buf)+1);
-    path = strtok(NULL, delim);
-    path[sizeof(path)+2] = EOF_BUF;
-    //printf("Path: %s\n", path);
-
-    //printf("filetype: %d\n", fileValid("dir\\script.js"));
-
-    if(method == NULL || path == NULL || get_filetype(path) == NULL)
+    if(strncmp("GET ", buf, 4) == 0)
     {
-        perror("Incomplete request\n");
-        pthread_exit(NULL);
-    }
-
-    if (!strcmp(method, "GET"))
-    {
-        // get request
-      if(fileValid(path) != -1)
-      {
-          get_req_reply(socket, path);
-//          filetype = get_filetype(path);
-          //printf("filetype: %s\n", filetype);
-
-      }
-      else
-          {
-           perror("404 file not found\n");
-          }
-
-//        strcpy(sendbuf, "HTTP/1.0 200 OK\r\n\r\n");
-//        send(socket, sendbuf, strlen(sendbuf), 0);
-
-//        if (strcmp(path, "/"))
-//        {
-//
-//            strcpy(sendbuf, "HTTP/1.0 200 OK\n"
-//                            "Server: Rorys Server v1.0\n"
-//                            "Content-Type: image/jpeg\r\n\r\n");
-//            send(socket, sendbuf, strlen(sendbuf), 0);
-//
-//            strcpy(newpath, DIR);
-//            strcpy(&newpath[strlen(DIR)], path);
-//
-//        } else
-//            {
-//            path = strcat(path, "index.html");
-//
-//            }
-
-    }
-    else if (!strcmp(method, "POST"))
+        ptr = buf + 4;
+        if(*ptr == '/')
         {
-        // if a post request is sent
-        printf("This server currently only implements HTTP/1.0\n");
-        pthread_exit(NULL);
-        }
-        else
+            i = strlen(path);
+            while(*ptr != ' ')
             {
-            printf("Unrecognised HTTP request\n");
-            pthread_exit(NULL);
+                path[i] = *ptr;
+                i++;
+                ptr++;
             }
+            path[i] = '\0';
+        }
 
-//        while(1){
-//            recv(sock, recbuf, 1000, 0);
-//            if (!strcmp(method, "GET")){
-//                test_func(sock);
+//        printf("path: %s \n\n", path);
+
+        if (get_filetype(path) == NULL) {
+            perror("Incomplete request\n");
+            pthread_exit(NULL);
+        }
+
+        // get request
+        if (fileValid(path) != -1) {
+            get_req_reply(socket, path);
+            pthread_exit(NULL);
+        } else {
+            strcpy(buf, INVALIDREQHEAD);
+            write(socket, buf, strlen(buf));
+            perror("404 file not found\n");
+            pthread_exit(NULL);
+        }
+    }
+    else
+    {
+        perror("Unrecognised HTTP request\n");
+        pthread_exit(NULL);
+    }
+    pthread_exit(NULL);
+    return 0;
+
+
+//
+//    method = (char*)malloc(sizeof(buf)+1);
+//    path = (char*)malloc(sizeof(path)+1);
+
+//    if (bytes_read > 0)
+//    {
+//        for(i = 1; i <= bytes_read; i++)
+//        {
+//            if(buf[i] == ' ')
+//            {
+//                delim = 1;
+//                printf("delim\n");
+//            }
+//            if(delim == 1)
+//            {
+//                printf("add to path: %c\n", buf[i]);
+//
+//                path[i] = buf[i];
+//            }
+//            else
+//            {
+//                method[i] = buf[i];
 //            }
 //        }
-
-//    while( token != NULL ) {
-//        printf( " %s\n", token);
-//        token = strtok(NULL, s);
+//        printf("path: %s \nmethod: %s\n", path, method);
 //    }
 
-//        printf("%s\n", buf);
+
+
+
 //
-//        if (strncmp("GET", buf, 5)){
-//            printf("get request\n");
-//            strcpy(buf, "");
-//            send(sock, buf, strlen(buf), 0);
-//        }
-//    }
+//
+//    strcpy(method, buf);
+//    method = strsep(&method, delim);
+//    printf("method: %s\n", method);
 
-    return 0;
+//    path = strsep(NULL, delim);
+//    printf("path: %s, strlen() = %lu", path, strlen(path));
+//    path[strlen(path)+1] = EOF_BUF;
+
+
+
+//    method = strtok(buf, delim);
+//    path = strtok(NULL, delim);
+//
+//    path[strlen(path)+1] = EOF_BUF;
+//    printf("path: %s", path);
+
+
 }
 
