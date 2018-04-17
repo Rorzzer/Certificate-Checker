@@ -4,7 +4,6 @@
 
 #ifndef COMP30023_2018_PROJECT_1_SERVER_H
 #define COMP30023_2018_PROJECT_1_SERVER_H
-
 #endif //COMP30023_2018_PROJECT_1_SERVER_H
 
 #define BYTES 1024
@@ -32,3 +31,5 @@ int fileValid(char path[]);
 void get_req_reply(int sock, char path[]);
 char * get_filetype(char *path);
 int get_filesize(char *path);
+
+

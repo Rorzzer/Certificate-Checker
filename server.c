@@ -93,8 +93,6 @@ int main(int argc, char *argv[])
                 sched_yield();
             }
     }
-
-    close(sockfd);
 }
 
 int fileValid(char path[])
@@ -122,7 +120,7 @@ char * get_filetype(char *path)
             j++;
         }
     }
-    //printf("%s\n", extension);
+//    printf("%s\n", extension);
     return extension;
 }
 
@@ -153,19 +151,19 @@ void get_req_reply(int sock, char path[])
     sprintf(filesizestr, "Content-Length: %d\r\n", get_filesize(path));
     strcat(buf, filesizestr);
 
-    if(!strcmp(filetype, HTML))
+    if(!strcasecmp(filetype, HTML))
     {
         strcat(buf, "Content-Type: text/html;\r\n\n");
     }
-    else if (!strcmp(filetype, JAVASCRIPT))
+    else if (!strcasecmp(filetype, JAVASCRIPT))
     {
         strcat(buf, "Content-Type: text/js;\r\n\n");
     }
-    else if (!strcmp(filetype, CSS))
+    else if (!strcasecmp(filetype, CSS))
     {
         strcat(buf, "Content-Type: text/css;\r\n\n");
     }
-    else if (!strcmp(filetype, JPEG))
+    else if (!strcasecmp(filetype, JPEG))
     {
         strcat(buf, "Content-Type: image/jpeg;\r\n\n");
     }
@@ -174,7 +172,7 @@ void get_req_reply(int sock, char path[])
         strcat(buf, "Content-Type: unknown;\r\n\n");
     }
 
-    strcat(buf, NEWLINE);
+//    strcat(buf, NEWLINE);
 
     write(sock, buf, strlen(buf));
 
@@ -183,7 +181,7 @@ void get_req_reply(int sock, char path[])
 void *parse_HTTP(void *sock)
 {
 
-    char buf[1000], path[1000];
+    char buf[1000], path[1000], newpath[1000];
     char *ptr;
     int bytes_read = 0, i = 0;
 
@@ -200,21 +198,34 @@ void *parse_HTTP(void *sock)
         return 0;
     }
 
+
     strcpy(path, ROOT);
+    strcpy(newpath, ROOT);
+    strcat(newpath, "/");
 
     if(strncmp("GET ", buf, 4) == 0)
     {
         ptr = buf + 4;
         if(*ptr == '/')
         {
+            int pathvalid = 0;
             i = strlen(path);
             while(*ptr != ' ')
             {
                 path[i] = *ptr;
                 i++;
                 ptr++;
+                pathvalid++;
             }
             path[i] = '\0';
+
+            if(!strcmp(newpath, path))
+            {
+                // if the path specified is '/' serve index.html
+                strcat(path, "index.html");
+            }
+//            printf("newpath: %s\n", newpath);
+//            printf("path: %s\n", path);
         }
         else
         {
