@@ -28,8 +28,8 @@ char ROOT[500];
 
 void *parse_HTTP(void *sock);
 int fileValid(char path[]);
-void get_req_reply(int sock, char path[]);
-char * get_filetype(char *path);
+void get_req_reply(int sock, char path[], char extension[]);
+int get_filetype(char *path, char extension[]);
 int get_filesize(char *path);
 
 
