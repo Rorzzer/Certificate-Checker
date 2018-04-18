@@ -97,106 +97,27 @@ int main(int argc, char *argv[])
 
                 pthread_detach(thread);
                 sched_yield();
-//                free(&arg);
+                free(arg);
             }
     }
 }
 
 int fileValid(char path[])
 {
-    //printf("path: \"%s\"\n", path);
     return open(path, O_RDONLY, 0);
 }
 
 int get_filetype(char *path, char extension[])
 {
-
+    // gets the file extension
     char *ext = strrchr(path, '.');
-    if (ext == NULL) {
-        ext = "";
-        return 0;
+
+    if (ext == NULL)
+    {
+    return 0;
     }
     strcpy(extension, ext + 1);
     return 1;
-
-
-    /*
-       ext = strrchr(filename, '.');
-       if (!ext) {
-
-    } else {
-        printf("extension is %s\n", ext + 1);
-    }
-
-    int i = 0, eofFilename = 0;
-
-    for(i = 0; i <= strlen(path); i++)
-    {
-        if(eofFilename != 0)
-        {
-            extension[i] = path[i];
-        }
-        if(path[i] == '.')
-        {
-            eofFilename = 1;
-        }
-    }
-
-//    strcpy(extension, "js");
-
-    return eofFilename;
-
-
-//    int eofFilename = 0;
-    int i = 0, k = 0, j = strlen(path);
-
-
-    while(path[i] != '.')
-    {
-        i++;
-    }
-
-    printf("i: %d\n",i );
-    int extlen = j - i;
-
-    for(k = 0; k <= extlen; k++)
-    {
-        extension[k] = path[i + k];
-    }
-
-    extension[k] = '\0';
-
-    return i;
-
-
-    int i = 0, j = 0;
-    int eofFilename = 0;
-    char *extension, newpath[1024], newext[10];
-
-    strcpy(newpath, path);
-
-    printf("newpath: %s\n", newpath);
-
-    extension = (char*)malloc(sizeof(newpath)+1);
-
-    for (i = 0; i <= strlen(newpath); i++)
-    {
-        if (eofFilename == 1){
-            newext[j] = newpath[i];
-//            printf("Extension[%d]: \"%c\" \n Path[%d]: \"%c\"\n extension: \"%s\"\n", j, newext[j], i, newpath[i], newext);
-            j++;
-        }
-        if(newpath[i] == '.'){
-            eofFilename = 1;
-        }
-    }
-
-    strcpy(extension, newext);
-//    printf("Extension: \"%s\" \n Path: \"%s\"\n", extension, newpath);
-    */
-//        printf("Extension: \"%s\"\n", extension);
-
-//    return extension;
 }
 
 int get_filesize(char *path)
@@ -215,27 +136,19 @@ int get_filesize(char *path)
 
 void get_req_reply(int sock, char path[], char extension[])
 {
-//    printf("filetype: \"%s\"", extension);
 
     char buf[1024], ext[100];
-    char /*filetype,*/ *filesizestr;
+    char *filesizestr;
 
     strcpy(ext, extension);
 
-//    filetype = (char*)malloc(sizeof(buf)+1);
     filesizestr = (char*)malloc(sizeof(buf)+1);
     assert(filesizestr);
 
-//    filetype = get_filetype(path);
 
     strcpy(buf, VALIDREQHEAD);
     sprintf(filesizestr, "Content-Length: %d\r\n", get_filesize(path));
     strcat(buf, filesizestr);
-
-    sprintf(filesizestr, "ext: \"%s\" \r\n", ext);
-    perror(filesizestr);
-
-//    get_filetype(path, ext);
 
     if(!strcmp(ext, HTML))
     {
@@ -258,10 +171,11 @@ void get_req_reply(int sock, char path[], char extension[])
         strcat(buf, "Content-Type: unknown\r\n\n");
     }
 
-//    strcat(buf, NEWLINE);
-//    printf("%s", filetype);
 
-    write(sock, buf, strlen(buf));
+    if((write(sock, buf, strlen(buf)) == -1))
+    {
+        perror("Write failed.\n");
+    }
 
 }
 
@@ -275,12 +189,8 @@ void *parse_HTTP(void *sock)
     int socket = *((int *) sock);
     free(sock);
 
-//    filetype = (char*)malloc(sizeof(buf)+1);
-
-
     bytes_read = recv(socket, buf, 1000, 0);
     buf[bytes_read-1] = EOF_BUF;
-//    printf("%s", buf);
 
 
     // wait for client response
@@ -316,16 +226,16 @@ void *parse_HTTP(void *sock)
                 // if the path specified is '/' serve index.html
                 strcat(path, "index.html");
             }
-//            printf("newpath: %s\n", newpath);
-//            printf("path: %s\n", path);
-
-
         }
         else
         {
             // not a valid path
             strcpy(buf, INVALIDREQHEAD);
-            write(socket, buf, strlen(buf));
+
+            if((write(socket, buf, strlen(buf)) == -1))
+            {
+                perror("Write failed.\n");
+            }
             perror("Not a valid path\n");
             pthread_exit(NULL);
         }
@@ -337,37 +247,38 @@ void *parse_HTTP(void *sock)
                 perror("Incomplete request\n");
                 pthread_exit(NULL);
             }
-//            printf("ext: %s\n", extension);
-
-            printf("path: \"%s\"\nExtension: \"%s\"\n", path, extension);
 
             get_req_reply(socket, path, extension);
-
-//            free(filetype);
 
             FILE *file;
 
             file = fopen(path, "r");
 
             char filebuf[get_filesize(path) + 1];
-            fread(filebuf, get_filesize(path), 1, file);
+
+            if((fread(filebuf, get_filesize(path), 1, file) == -1))
+            {
+                perror("Read failed.\n");
+            }
 
             send(socket, filebuf, get_filesize(path), 0);
             fclose(file);
-
 
             pthread_exit(NULL);
         } else {
             // file not found
             strcpy(buf, INVALIDREQHEAD);
-            write(socket, buf, strlen(buf));
+
+            if((write(socket, buf, strlen(buf)) == -1))
+            {
+                perror("Write failed.\n");
+            }
             perror("404 file not found\n");
             pthread_exit(NULL);
         }
     }
     else
     {
-//        printf("%s\n",buf);
         perror("Unrecognised HTTP request\n");
         pthread_exit(NULL);
     }
