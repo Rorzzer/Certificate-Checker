@@ -1,6 +1,6 @@
 ##Adapted from http://www.cs.colby.edu/maxwell/courses/tutorials/maketutor/
 CC=gcc
-CFLAGS=-Wall -pthread -std=gnu99 -I. -O3
+CFLAGS=-Wall -pthread -g -std=gnu99 -I. -O3
 DEPS = server.h
 OBJ = server.o
 EXE = server

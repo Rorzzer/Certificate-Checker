@@ -6,7 +6,9 @@
 #define COMP30023_2018_PROJECT_1_SERVER_H
 #endif //COMP30023_2018_PROJECT_1_SERVER_H
 
-#define BYTES 1024
+#define MAXBUF 1024
+#define MAXEXT 50
+#define MAXPATH 1000
 #define DIR "dir"
 #define SERVER "RPOWELL HTTP Server v1.0\r\n"
 #define VERSION "HTTP/1.0"
